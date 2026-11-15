@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Umgebung / Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Terraform ---
+# State contains the generated database password: never commit it.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+# .terraform.lock.hcl IS committed (pins provider checksums).
+
+# --- Kubernetes ---
+k8s/**/secret.yaml
+*.secret.yaml
+
+# --- Scan-Ergebnisse (werden als CI-Artefakte abgelegt) ---
+trivy-results.*
+sbom.*
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
