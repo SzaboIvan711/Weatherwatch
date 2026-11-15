@@ -1,0 +1,39 @@
+[project]
+name = "weatherwatch"
+version = "1.0.0"
+description = "WeatherWatch – Wetter-App als Träger einer DevOps-Kette (Modul CDS212)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+# Put the project root on sys.path so `from app import ...` resolves.
+pythonpath = ["."]
+markers = [
+    "integration: needs a real PostgreSQL (TEST_DATABASE_URL); skipped otherwise",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+# Coverage gate: CI fails when coverage drops below this value.
+fail_under = 80
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E,F = pycodestyle/pyflakes, I = import sorting, B = common bugs,
+# UP = outdated idioms, S = bandit security checks, SIM = simplifications
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest works; fixed dummy credentials are fine in tests.
+"tests/**" = ["S101", "S105", "S106"]
+# Binding to all interfaces is intended inside a container.
+"gunicorn.conf.py" = ["S104"]

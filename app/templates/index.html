@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeatherWatch · {{ location.name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">WeatherWatch · {{ location.name }}</p>
+      <h1>Wetter in {{ location.name }}</h1>
+      <p class="lead">Aktuelle Werte und Vorhersage für 3 Tage</p>
+    </header>
+
+    <form method="get" action="{{ url_for('main.index') }}" class="picker">
+      <label for="city">Ort</label>
+      <select id="city" name="city">
+        {% for loc in locations %}
+        <option value="{{ loc.slug }}" {% if loc.slug == location.slug %}selected{% endif %}>{{ loc.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Anzeigen</button>
+    </form>
+
+    {% if error %}
+    <section class="card error" role="alert">{{ error }}</section>
+    {% else %}
+    {% set now = result.snapshot.report.current %}
+    <section class="card current">
+      <div class="temp">{{ '%.0f'|format(now.temperature_c) if now.temperature_c is not none else '–' }}<span>°C</span></div>
+      <div class="facts">
+        <p class="desc">{{ now.description }}</p>
+        <p>Gefühlt {{ '%.0f'|format(now.apparent_temperature_c) if now.apparent_temperature_c is not none else '–' }} °C</p>
+        <p>Wind {{ '%.0f'|format(now.wind_speed_kmh) if now.wind_speed_kmh is not none else '–' }} km/h · Feuchte {{ '%.0f'|format(now.humidity_pct) if now.humidity_pct is not none else '–' }} %</p>
+      </div>
+      {% if result.stale %}
+      <p class="stale">Hinweis: Der Wetterdienst ist gerade nicht erreichbar – angezeigt werden die zuletzt gespeicherten Werte.</p>
+      {% endif %}
+    </section>
+
+    <section class="forecast">
+      {% for day in forecast %}
+      <article class="card day">
+        <h2>{{ day.date }}</h2>
+        <p class="desc">{{ day.description }}</p>
+        <p class="range">{{ '%.0f'|format(day.temperature_min_c) if day.temperature_min_c is not none else '–' }}° / {{ '%.0f'|format(day.temperature_max_c) if day.temperature_max_c is not none else '–' }}°</p>
+        <p>Regen {{ '%.0f'|format(day.precipitation_probability_pct) if day.precipitation_probability_pct is not none else '–' }} %</p>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <footer>
+      <ul class="badges">
+        <li>Weather API</li>
+        <li>15-min Cache</li>
+        <li>PostgreSQL</li>
+      </ul>
+      <p>{{ attribution }}{% if result %} · abgerufen {{ result.snapshot.fetched_at.strftime('%Y-%m-%d %H:%M') }} UTC ({{ result.source }}){% endif %} · Version {{ version }}</p>
+    </footer>
+  </main>
+</body>
+</html>
