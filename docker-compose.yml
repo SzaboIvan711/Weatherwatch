@@ -1,0 +1,63 @@
+# Local development: the application and its database.
+#   docker compose up --build     start (http://localhost:8000)
+#   docker compose down           stop, KEEP the database volume
+#   docker compose down -v        stop and DELETE the volume
+#
+# Optional: cp .env.example .env to override the defaults below.
+
+name: weatherwatch
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0-local}
+    image: weatherwatch:local
+    ports:
+      # Bound to the loopback interface only: not reachable from the LAN.
+      - "127.0.0.1:8000:8000"
+    environment:
+      # "db" is the DNS name of the database container on the compose network.
+      DATABASE_URL: postgresql://weatherwatch:${POSTGRES_PASSWORD:-weatherwatch-local-only}@db:5432/weatherwatch
+      APP_VERSION: ${APP_VERSION:-1.0.0-local}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-900}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+    depends_on:
+      db:
+        # Without this condition web would start before Postgres accepts
+        # connections.
+        condition: service_healthy
+    # Hardening: read-only root filesystem, writable /tmp only, no Linux
+    # capabilities, no privilege escalation.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: weatherwatch
+      # Local development credential only. The database port is NOT published
+      # to the host; only containers on this compose network can reach it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-weatherwatch-local-only}
+      POSTGRES_DB: weatherwatch
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weatherwatch -d weatherwatch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  # Named volume: survives "docker compose down" (but not "down -v").
+  db-data:
