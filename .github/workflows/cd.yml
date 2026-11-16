@@ -1,0 +1,86 @@
+# CD: deploy to Render after CI has passed on main, then verify the deploy.
+#
+#   push to main -> CI (green) -> this workflow
+#     1. POST to the Render deploy hook (secret RENDER_DEPLOY_HOOK)
+#     2. poll /health until it reports exactly the commit CI just tested
+#     3. run the smoke test against the public URL
+#
+# Render's own auto-deploy is OFF (render.yaml: autoDeployTrigger "off"), so a
+# red CI run can never reach production.
+#
+# Setup (once, see DEPLOYMENT.md): GitHub -> Settings -> Environments ->
+# "production" with
+#   secret   RENDER_DEPLOY_HOOK  deploy hook URL from Render (Settings -> Deploy Hook)
+#   variable APP_URL             https://<service>.onrender.com
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Render
+    # Security: workflow_run also fires for pull requests from forks whose
+    # branch happens to be called "main". Only deploy for a green CI run that
+    # was triggered by a push to THIS repository, or a manual run on main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - name: Check configuration
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          [ -n "$RENDER_DEPLOY_HOOK" ] || { echo "secret RENDER_DEPLOY_HOOK is not set" >&2; exit 1; }
+          [ -n "$APP_URL" ] || { echo "variable APP_URL is not set" >&2; exit 1; }
+          case "$APP_URL" in https://*) ;; *) echo "APP_URL must start with https://" >&2; exit 1 ;; esac
+          echo "deploying commit $DEPLOY_SHA to $APP_URL"
+
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          # The URL itself is the credential: never echo it. GitHub masks
+          # secrets in logs, we additionally print only the status code.
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                     --request POST "$RENDER_DEPLOY_HOOK")"
+          echo "deploy hook answered HTTP $status"
+          case "$status" in 200|201|202) ;; *) exit 1 ;; esac
+
+      - name: Wait for the new commit and smoke-test it
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          EXPECTED_COMMIT: ${{ env.DEPLOY_SHA }}
+          # Docker build + release on the free tier takes a few minutes.
+          # Linear backoff 10,20,...,140 s -> about 17 minutes in total.
+          HEALTH_RETRIES: "15"
+          BACKOFF_SECONDS: "10"
+        run: bash scripts/smoke-test.sh "$APP_URL"

@@ -1,0 +1,40 @@
+# Render Blueprint – the Render service as code.
+# Spec: https://render.com/docs/blueprint-spec
+#
+# Deploys are driven by GitHub Actions (.github/workflows/cd.yml) through the
+# deploy hook, AFTER CI is green. Render's own auto-deploy is therefore off.
+
+services:
+  - type: web
+    name: weatherwatch
+    runtime: docker
+    # Free instance: sleeps after 15 min without traffic, ~1 min cold start.
+    # Frankfurt is the region closest to Switzerland (cannot be changed later).
+    plan: free
+    region: frankfurt
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Liveness path without dependencies. Never /ready: a database or API
+    # hiccup must not make Render take the service out of rotation.
+    healthCheckPath: /health
+    # Quoted on purpose: an unquoted off is parsed as boolean false by YAML 1.1.
+    autoDeployTrigger: "off"
+    envVars:
+      # Render routes to PORT; the container listens on 8000.
+      - key: PORT
+        value: "8000"
+      - key: APP_VERSION
+        value: "1.0.0"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CACHE_TTL_SECONDS
+        value: "900"
+      # One process, several threads (see gunicorn.conf.py / ADR 0004).
+      - key: GUNICORN_WORKERS
+        value: "1"
+      # Secrets are NOT declared here. Optional, set in the Render dashboard
+      # (Environment -> Add Environment Variable) if you use them:
+      #   DATABASE_URL     external Postgres; unset => in-memory cache (ADR 0001)
+      #   WEATHER_API_KEY  only for the commercial Open-Meteo API
+      # RENDER_GIT_COMMIT is set by Render itself and shown in /health.
