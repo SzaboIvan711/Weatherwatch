@@ -1,0 +1,10 @@
+# Allow-list: the build context contains only what the image needs.
+# Everything else (.git, .env, tests, terraform state, docs, ...) can never
+# end up in an image layer by accident.
+*
+!app/
+!wsgi.py
+!gunicorn.conf.py
+!requirements.txt
+**/__pycache__
+**/*.pyc
