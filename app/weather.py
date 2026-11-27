@@ -57,9 +57,9 @@ def _build_session(retries: int) -> requests.Session:
         read=retries,
         status=retries,
         backoff_factor=0.5,
-        status_forcelist=(429, 502, 503, 504),
+        status_forcelist=(502, 503, 504),
         allowed_methods=frozenset({"GET"}),
-        respect_retry_after_header=True,
+        respect_retry_after_header=False,
         raise_on_status=False,
     )
     session = requests.Session()
@@ -76,7 +76,7 @@ class OpenMeteoClient:
         api_key: str | None = None,
         timeout_seconds: float = 5.0,
         session: requests.Session | None = None,
-        retries: int = 2,
+        retries: int = 1,
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
