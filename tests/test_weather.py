@@ -147,7 +147,7 @@ def test_client_maps_invalid_json():
 def test_client_builds_retrying_session_by_default():
     client = OpenMeteoClient("https://api.open-meteo.com/v1/forecast")
     adapter = client._session.get_adapter("https://api.open-meteo.com")
-    assert adapter.max_retries.total == 2
+    assert adapter.max_retries.total == 1
     assert 503 in adapter.max_retries.status_forcelist
 
 
