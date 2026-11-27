@@ -24,3 +24,6 @@ accesslog = "-"
 errorlog = "-"
 loglevel = os.environ.get("LOG_LEVEL", "info").lower()
 proc_name = "weatherwatch"
+
+# Disable unused Gunicorn control socket.
+control_socket_disable = True
